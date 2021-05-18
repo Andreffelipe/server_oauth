@@ -20,7 +20,6 @@ router.get('/oauth/authenticate', async (req, res, next) => {
 });
 
 router.post('/oauth/authenticate', async (req, res, next) => {
-  console.log(req.body)
 
   let UserModel = mongoose.model('User');
   req.body.user = await UserModel.findOne({ username: req.body.username });
@@ -29,6 +28,7 @@ router.post('/oauth/authenticate', async (req, res, next) => {
 }, oauth.authorize({
   authenticateHandler: {
     handle: req => {
+      console.log(req.body)
       return req.body.user;
     }
   }
