@@ -1,70 +1,146 @@
-var uid = require('uid2');
-var mongoose = require('mongoose');
-var Schema = mongoose.Schema;
-var AutoIncrement = require('mongoose-sequence');
+const mongoose = require('mongoose');
 
-var ApplicationSchema = new Schema({
-	title: { type: String, required: true },
-	oauth_id: { type: Number, unique: true },
-	oauth_secret: { type: String, default: function() {
-			return uid(42);
-		}
-	},
-	domains: [ { type: String } ]
-});
+/*
+  Modelo de token de acesso
+*/
 
-var GrantCodeSchema = new Schema({
-	code: { type: String, unique: true, default: function() {
-			return uid(24);
-		}
-	},
-	user: { type: Schema.Types.ObjectId, ref: 'Account' },
-	application: { type: Schema.Types.ObjectId, ref: 'Application' },
-	scope: [ { type: String } ],
-	active: { type: Boolean, default: true }
-});
+let OAuthAccessTokenModel = mongoose.model('OAuthAccessToken', new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  client: { type: mongoose.Schema.Types.ObjectId, ref: 'OAuthClient' },
+  accessToken: { type: String },
+  accessTokenExpiresAt: { type: Date },
+  refreshToken: { type: String },
+  refreshTokenExpiresAt: { type: Date },
+  scope: { type: String }
+}, {
+  timestamps: true
+}), 'oauth_access_tokens');
 
-var AccessTokenSchema = new Schema({
-	token: { type: String, unique: true, default: function() {
-			return uid(124);
-		}
-	},
-	user: { type: Schema.Types.ObjectId, ref: 'Account' },
-	application: { type: Schema.Types.ObjectId, ref: 'Application' },
-	grant: { type: Schema.Types.ObjectId, ref: 'GrantCode' },
-	scope: [ { type: String }],
-	expires: { type: Date, default: function(){
-		var today = new Date();
-		var length = 10; // Length (in minutes) of our access token
-		return new Date(today.getTime() + length*60000);
-	} },
-	active: { type: Boolean, get: function(value) {
-		if (this.expires < new Date() || !value) {
-			return false;
-		} else {
-			return value;
-		}
-	}, default: true }
-});
+/*
+  Modelo de Código de Autorização
+*/
+let OAuthCodeModel = mongoose.model('OAuthCode', new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  client: { type: mongoose.Schema.Types.ObjectId, ref: 'OAuthClient' },
+  authorizationCode: { type: String },
+  expiresAt: { type: Date },
+  scope: { type: String }
+}, {
+  timestamps: true
+}), 'oauth_auth_codes');
 
-var RefreshTokenSchema = new Schema({
-	token: { type: String, unique: true, default: function(){
-		return uid(124);
-	}},
-	user: { type: Schema.Types.ObjectId, ref: 'Account' },
-	application: { type: Schema.Types.ObjectId, ref: 'Application' }
-});
+/*
+  Modelo de Cliente
+*/
 
-ApplicationSchema.plugin(AutoIncrement, {inc_field: 'oauth_id'});
+let OAuthClientModel = mongoose.model('OAuthClient', new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  clientId: { type: String },
+  clientSecret: { type: String },
+  redirectUris: {
+    type: Array, default: [
+      'https://alexa.amazon.co.jp/api/skill/link/M53SNJWT9W4Y3',
+      'https://layla.amazon.com/api/skill/link/M53SNJWT9W4Y3',
+      'https://pitangui.amazon.com/api/skill/link/M53SNJWT9W4Y3'
+    ]
+  },
+  grants: { type: Array },
+}, {
+  timestamps: true
+}), 'oauth_clients');
 
-var Application = mongoose.model('Application', ApplicationSchema);
-var GrantCode = mongoose.model('GrantCode', GrantCodeSchema);
-var AccessToken = mongoose.model('AccessToken', AccessTokenSchema);
-var RefreshToken = mongoose.model('RefreshToken', RefreshTokenSchema);
+module.exports.getAccessToken = async (accessToken) => {
 
-module.exports = {
-	Application: Application,
-	GrantCode: GrantCode,
-	AccessToken: AccessToken,
-	RefreshToken: RefreshToken
-}
+  let _accessToken = await OAuthAccessTokenModel.findOne({ accessToken: accessToken })
+    .populate('user')
+    .populate('client');
+
+  if (!_accessToken) {
+    return false;
+  }
+
+  _accessToken = _accessToken.toObject();
+
+  if (!_accessToken.user) {
+    _accessToken.user = {};
+  }
+  return _accessToken;
+};
+
+module.exports.getRefreshToken = (refreshToken) => {
+  return OAuthAccessTokenModel.findOne({ refreshToken: refreshToken })
+    .populate('user')
+    .populate('client');
+};
+
+module.exports.getAuthorizationCode = (code) => {
+  return OAuthCodeModel.findOne({ authorizationCode: code })
+    .populate('user')
+    .populate('client');
+};
+
+module.exports.getClient = (clientId, clientSecret) => {
+  let params = { clientId: clientId };
+  if (clientSecret) {
+    params.clientSecret = clientSecret;
+  }
+  return OAuthClientModel.findOne(params);
+};
+
+module.exports.getUser = async (username, password) => {
+  let UserModel = mongoose.model('User');
+  let user = await UserModel.findOne({ username: username });
+  if (user.validatePassword(password)) {
+    return user;
+  }
+  return false;
+};
+
+module.exports.getUserFromClient = (client) => {
+  // let UserModel = mongoose.model('User');
+  // return UserModel.findById(client.user);
+  return {};
+};
+
+module.exports.saveToken = async (token, client, user) => {
+  let accessToken = (await OAuthAccessTokenModel.create({
+    user: user.id || null,
+    client: client.id,
+    accessToken: token.accessToken,
+    accessTokenExpiresAt: token.accessTokenExpiresAt,
+    refreshToken: token.refreshToken,
+    refreshTokenExpiresAt: token.refreshTokenExpiresAt,
+    scope: token.scope,
+  })).toObject();
+
+  if (!accessToken.user) {
+    accessToken.user = {};
+  }
+
+  return accessToken;
+};
+
+module.exports.saveAuthorizationCode = (code, client, user) => {
+  let authCode = new OAuthCodeModel({
+    user: user.id,
+    client: client.id,
+    authorizationCode: code.authorizationCode,
+    expiresAt: code.expiresAt,
+    scope: code.scope
+  });
+  return authCode.save();
+};
+
+module.exports.revokeToken = async (accessToken) => {
+  let result = await OAuthAccessTokenModel.deleteOne({
+    refreshToken: accessToken.refreshToken
+  });
+  return result.deletedCount > 0;
+};
+
+module.exports.revokeAuthorizationCode = async (code) => {
+  let result = await OAuthCodeModel.deleteOne({
+    authorizationCode: code.authorizationCode
+  });
+  return result.deletedCount > 0;
+};
