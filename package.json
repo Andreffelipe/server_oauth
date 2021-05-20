@@ -19,9 +19,14 @@
     "express-session": "^1.17.1",
     "hbs": "^4.1.2",
     "http-errors": "^1.8.0",
+    "http-proxy-middleware": "^2.0.0",
     "mongoose": "^5.12.9",
     "morgan": "^1.10.0",
     "node-sass-middleware-5": "^0.0.2",
-    "oauth2-server": "git+https://github.com/Andreffelipe/node-oauth2-server.git"
+    "oauth2-server": "git+https://github.com/Andreffelipe/node-oauth2-server.git",
+    "winston": "^3.3.3"
+  },
+  "devDependencies": {
+    "@types/http-proxy-middleware": "^1.0.0"
   }
 }

@@ -1,16 +1,16 @@
-var createError = require('http-errors');
-var cors = require('cors');
-var express = require('express');
-var session = require('express-session');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
-var sassMiddleware = require('node-sass-middleware-5');
-var mongoose = require('mongoose');
-var flash = require('connect-flash');
-var env = require('./env');
-
-var app = express();
+const createError = require('http-errors');
+const cors = require('cors');
+const express = require('express');
+const session = require('express-session');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const logger = require('morgan');
+const sassMiddleware = require('node-sass-middleware-5');
+const mongoose = require('mongoose');
+const flash = require('connect-flash');
+const env = require('./env');
+const { proxy } = require('./proxy')
+const app = express();
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -33,6 +33,7 @@ app.use(sassMiddleware({
 }));
 app.use(flash());
 app.use(express.static(path.join(__dirname, 'public')));
+//app.use(proxy)
 
 // Database
 if (env.isProduction) {
