@@ -1,0 +1,62 @@
+Esta é uma pergunta antiga, mas tem uma classificação alta no Google. Quase não consigo acreditar nas respostas mais votadas, porque executar um processo node.js dentro de uma sessão de tela, com &ou mesmo com o nohupsinalizador - todos eles - são apenas soluções alternativas.
+
+Especialmente a solução screen / tmux, que realmente deve ser considerada uma solução amadora . Screen e Tmux não são para manter os processos em execução, mas para multiplexar sessões de terminal. Tudo bem, quando você está executando um script no servidor e deseja desconectar. Mas para um servidor node.js. você não deseja que seu processo seja anexado a uma sessão de terminal. Isso é muito frágil. Para manter as coisas funcionando, você precisa daemonize o processo!
+
+Existem muitas boas ferramentas para fazer isso.
+
+PM2 : http://pm2.keymetrics.io/
+
+# basic usage
+$ npm install pm2 -g
+$ pm2 start server.js
+
+# you can even define how many processes you want in cluster mode:
+$ pm2 start server.js -i 4
+
+# you can start various processes, with complex startup settings
+# using an ecosystem.json file (with env variables, custom args, etc):
+$ pm2 start ecosystem.json
+Uma grande vantagem que vejo a favor do PM2 é que ele pode gerar o script de inicialização do sistema para fazer com que o processo persista entre as reinicializações:
+
+$ pm2 startup [platform]
+Onde platformpode estar ubuntu|centos|redhat|gentoo|systemd|darwin|amazon.
+
+forever.js : https://github.com/foreverjs/forever
+
+# basic usage
+$ npm install forever -g
+$ forever start app.js
+
+# you can run from a json configuration as well, for
+# more complex environments or multi-apps
+$ forever start development.json
+Scripts de inicialização :
+
+Não vou entrar em detalhes sobre como escrever um script init, porque não sou especialista neste assunto e seria muito longo para essa resposta, mas basicamente são simples scripts de shell, acionados por eventos do SO. Você pode ler mais sobre isso aqui
+
+Docker :
+
+Basta executar o servidor em um contêiner do Docker com a -dopção e, voilá , você tem um servidor node.j daemonizado!
+
+Aqui está uma amostra do Dockerfile (no guia oficial node.js. ):
+
+FROM node:argon
+
+# Create app directory
+RUN mkdir -p /usr/src/app
+WORKDIR /usr/src/app
+
+# Install app dependencies
+COPY package.json /usr/src/app/
+RUN npm install
+
+# Bundle app source
+COPY . /usr/src/app
+
+EXPOSE 8080
+CMD [ "npm", "start" ]
+Em seguida, crie sua imagem e execute seu contêiner:
+
+$ docker build -t <your username>/node-web-app .
+$ docker run -p 49160:8080 -d <your username>/node-web-app
+Espero que isso ajude alguém a chegar nesta página. Sempre use a ferramenta adequada para o trabalho. Isso vai lhe poupar muitas dores de cabeça e durante horas!
